@@ -25,8 +25,8 @@ To build on a Mac yourself: `bash scripts/build-unsigned.sh build`.
 
 ## Install
 
-Signing happens on your own PC with your own free Apple ID, using
-[forge](../forge/README.md):
+Signing happens on your own PC with your own free Apple ID, using forge, the companion
+Windows tool:
 
 ```
 forge install TLShell-unsigned.ipa
