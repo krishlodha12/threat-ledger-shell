@@ -4,7 +4,7 @@ import Network
 
 /// The site this shell shows. Navigation stays on this host; every other link opens in Safari.
 let siteURL = URL(string: "https://krishlodha12.github.io/cyber-intel-scraper/")!
-let background = Color(red: 0x0e / 255, green: 0x0e / 255, blue: 0x0c / 255)
+let ledgerBackground = Color(red: 0x0e / 255, green: 0x0e / 255, blue: 0x0c / 255)
 
 @main
 struct ShellApp: App {
@@ -14,7 +14,7 @@ struct ShellApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                background.ignoresSafeArea()
+                ledgerBackground.ignoresSafeArea()
                 WebView(model: model)
                 if model.showOffline {
                     OfflineView { model.reload() }
@@ -90,8 +90,8 @@ struct WebView: UIViewRepresentable {
         webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.isOpaque = false
-        webView.backgroundColor = UIColor(background)
-        webView.scrollView.backgroundColor = UIColor(background)
+        webView.backgroundColor = UIColor(ledgerBackground)
+        webView.scrollView.backgroundColor = UIColor(ledgerBackground)
 
         let refresh = UIRefreshControl()
         refresh.addTarget(context.coordinator, action: #selector(Coordinator.pulled(_:)), for: .valueChanged)
@@ -121,7 +121,7 @@ struct WebView: UIViewRepresentable {
                 return .allow
             }
             if ["http", "https", "mailto"].contains(url.scheme ?? "") {
-                UIApplication.shared.open(url)
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
             }
             return .cancel
         }
@@ -129,7 +129,7 @@ struct WebView: UIViewRepresentable {
         /// target="_blank" links: open outside instead of in a new web view.
         func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
                      for action: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if let url = action.request.url { UIApplication.shared.open(url) }
+            if let url = action.request.url { UIApplication.shared.open(url, options: [:], completionHandler: nil) }
             return nil
         }
 
@@ -164,6 +164,6 @@ struct OfflineView: View {
         }
         .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(background)
+        .background(ledgerBackground)
     }
 }
