@@ -1,0 +1,76 @@
+name: build-unsigned
+
+# Builds the app twice in different folders on GitHub's free macOS runner and checks the
+# two .ipa files are byte-identical. The output is UNSIGNED: no certificates, profiles or
+# Apple ID are used here or stored as secrets.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # build number = commit count
+
+      - name: Pick the newest stable Xcode
+        run: |
+          echo "Installed Xcodes:"; ls -d /Applications/Xcode*.app
+          XCODE="$(ls -d /Applications/Xcode_*.app | grep -vi beta | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+          echo "iOS SDKs:"; xcodebuild -showsdks | grep -i iphoneos
+
+      - name: Build A
+        run: bash scripts/build-unsigned.sh "$RUNNER_TEMP/a"
+
+      - name: Build B (fresh copy, different path)
+        run: |
+          rm -rf "$RUNNER_TEMP/src-b" && mkdir -p "$RUNNER_TEMP/src-b"
+          git worktree add "$RUNNER_TEMP/src-b/tree" HEAD
+          bash "$RUNNER_TEMP/src-b/tree/scripts/build-unsigned.sh" "$RUNNER_TEMP/b"
+
+      - name: Compare
+        id: compare
+        run: |
+          A="$(shasum -a 256 "$RUNNER_TEMP/a/TLShell-unsigned.ipa" | cut -d' ' -f1)"
+          B="$(shasum -a 256 "$RUNNER_TEMP/b/TLShell-unsigned.ipa" | cut -d' ' -f1)"
+          echo "A $A"; echo "B $B"
+          mkdir -p dist
+          cp "$RUNNER_TEMP/a/TLShell-unsigned.ipa" "$RUNNER_TEMP/a/BUILD-INFO.txt" dist/
+          (cd dist && shasum -a 256 TLShell-unsigned.ipa > SHA256SUMS)
+          if [ "$A" = "$B" ]; then
+            echo "reproducible=yes" >> "$GITHUB_OUTPUT"
+            echo "reproducible: yes" >> dist/BUILD-INFO.txt
+          else
+            echo "reproducible=no" >> "$GITHUB_OUTPUT"
+            echo "reproducible: NO" >> dist/BUILD-INFO.txt
+            (cd "$RUNNER_TEMP" && mkdir -p ua ub && cd ua && unzip -q ../a/TLShell-unsigned.ipa && cd ../ub && unzip -q ../b/TLShell-unsigned.ipa && cd .. && diff -r ua ub || true)
+          fi
+          {
+            echo "### Unsigned build"
+            echo '```'; cat dist/BUILD-INFO.txt; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: TLShell-unsigned
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail if the two builds differ
+        if: steps.compare.outputs.reproducible != 'yes'
+        run: |
+          echo "The two builds are not byte-identical; see the diff above."
+          exit 1
